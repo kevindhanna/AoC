@@ -1,4 +1,5 @@
 use std::io::Read;
+use std::time::Instant;
 
 #[derive(Clone)]
 struct Node {
@@ -15,7 +16,7 @@ fn read_file(filename: &str) -> String {
     contents
 }
 
-fn part_1(rules: &Vec<String>) -> u32 {
+fn build_trie(rules: Vec<String>) -> Vec<Node> {
     let mut bags: Vec<Node> = Vec::new();
     for rule in rules {
         let rule: Vec<&str> = rule.split(":").collect::<Vec<&str>>();
@@ -23,25 +24,7 @@ fn part_1(rules: &Vec<String>) -> u32 {
     }
     let trie: Vec<Node> = bags.iter().map(|bag| populate_children(bag.clone(), &bags))
                                      .collect();
-    let mut count = 0;
-    for node in trie {
-        if node.name != "shiny gold" && can_hold(node, "shiny gold") {
-            count += 1;
-        }
-    }
-    count
-}
-
-fn can_hold(node: Node, colour: &str) -> bool {
-    if node.name.as_str() == colour {
-        return true;
-    }
-    for child in node.children {
-        if can_hold(child, colour) {
-            return true
-        }
-    }
-    false
+    trie
 }
 
 fn build_base_node(rule: Vec<&str>) -> Node {
@@ -82,15 +65,39 @@ fn populate_children(mut node: Node, bags: &Vec<Node>) -> Node {
     node
 }
 
-fn part_2(rules: &Vec<String>) -> Option<u32> {
-    let mut bags: Vec<Node> = Vec::new();
-    for rule in rules {
-        let rule: Vec<&str> = rule.split(":").collect::<Vec<&str>>();
-        bags.push(build_base_node(rule));
+fn find(trie: &Vec<Node>, name: &str) -> Option<Node> {
+    for node in trie {
+        if node.name.as_str() == name {
+            return Some(node.clone())
+        }
     }
-    let trie: Vec<Node> = bags.iter().map(|bag| populate_children(bag.clone(), &bags))
-                                     .collect();
-    if let Some(shiny_gold) = find(&trie, "shiny gold") {
+    None
+}
+
+fn part_1(trie: &Vec<Node>) -> u32 {
+    let mut count = 0;
+    for node in trie {
+        if node.name != "shiny gold" && can_hold(node.clone(), "shiny gold") {
+            count += 1;
+        }
+    }
+    count
+}
+
+fn can_hold(node: Node, colour: &str) -> bool {
+    if node.name.as_str() == colour {
+        return true;
+    }
+    for child in node.children {
+        if can_hold(child, colour) {
+            return true
+        }
+    }
+    false
+}
+
+fn part_2(trie: &Vec<Node>) -> Option<u32> {
+    if let Some(shiny_gold) = find(trie, "shiny gold") {
         return Some(calculate_total(shiny_gold) - 1);
     }
     None
@@ -106,15 +113,6 @@ fn calculate_total(node: Node) -> u32 {
     }
 
     child_count * node.count + node.count
-}
-
-fn find(trie: &Vec<Node>, name: &str) -> Option<Node> {
-    for node in trie {
-        if node.name.as_str() == name {
-            return Some(node.clone())
-        }
-    }
-    None
 }
 
 fn part_2_tests() {
@@ -137,7 +135,10 @@ fn build_node(name: &str, count: u32, children: Vec<Node>) -> Node {
 }
 
 fn main() {
+    let now = Instant::now();
     let contents = read_file("input.txt");
+    let read = Instant::now();
+    println!("read file: {:?}", read.duration_since(now));
     let rules = contents
         .trim()
         .split("\n")
@@ -149,12 +150,22 @@ fn main() {
              .replace(" bags, ", ",")
              .replace(" bag, ", ","))
         .collect::<Vec<String>>();
+    let splits = Instant::now();
+    println!("splits and replaces: {:?}", splits.duration_since(read));
+    let trie: Vec<Node> = build_trie(rules);
+    let trie_time = Instant::now();
+    println!("trie: {:?}", trie_time.duration_since(splits));
 
-    let part_1_result = part_1(&rules);
+    let part_1_result = part_1(&trie);
     println!("part 1: {}", part_1_result);
+    let part1 = Instant::now();
+    println!("part1: {:?}", part1.duration_since(trie_time));
 
     part_2_tests();
-    if let Some(part_2_result) = part_2(&rules) {
+    if let Some(part_2_result) = part_2(&trie) {
         println!("part 2: {}", part_2_result);
     }
+    let part2 = Instant::now();
+    println!("part2: {:?}", part2.duration_since(part1));
+    println!("total: {:?}", part2.duration_since(now));
 }
