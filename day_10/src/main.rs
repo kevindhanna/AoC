@@ -1,6 +1,6 @@
 use std::io::Read;
-#[derive(Clone)]
 
+#[derive(Clone)]
 struct Node {
     jolts: u32,
     value: u64
@@ -12,6 +12,7 @@ fn main() {
                           .split("\n")
                           .map(|number| number.parse::<u32>().unwrap())
                           .collect::<Vec<u32>>();
+
     adaptors.sort();
     let part_1_result = part_1(&adaptors);
     println!("part 1: {}", part_1_result);
@@ -42,6 +43,7 @@ fn part_2(adaptors: &Vec<u32>) -> u64 {
                                               value: 0
                                           })
                                           .collect();
+
     adaptors.push(Node {
         jolts: adaptors[adaptors.len() - 1].jolts + 3,
         value: 0
@@ -60,12 +62,14 @@ fn walk_and_count(mut head: Node, mut tail: Vec<Node>, mut adaptors: Vec<Node>) 
     for child in &tail {
         if head.jolts - child.jolts < 4 {
             head.value += child.value;
+        } else {
+            break;
         }
     }
     if adaptors.len() == 0 {
         return head.value;
     }
-    tail.push(head);
+    tail.insert(0, head);
     head = adaptors.pop().unwrap();
     return walk_and_count(head, tail, adaptors);
 }
