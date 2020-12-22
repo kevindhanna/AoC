@@ -37,48 +37,116 @@ fn main() {
     let contents = read_file("input.txt");
     let tiles = build_tiles(contents);
 
-    // tiles_test();
-    // part_1_tests();
-    // let part_1_result = part_1(tiles);
-    // println!("part 1: {}", part_1_result.0);
+    tiles_test();
+    part_1_tests();
+    let part_1_result = part_1(tiles);
+    println!("part 1: {}", part_1_result.0);
 
     part_2_test();
-    // let part_2_result = part_2(part_1_result.1);
-    // println!("part 2: {}", part_2_result);
+    let part_2_result = part_2(part_1_result.1);
+    println!("part 2: {}", part_2_result);
 }
 
 fn part_2(grid: Vec<Vec<Tile>>) -> u32 {
-    println!("{}", grid[0][1].id);
-    _print_tile(&grid[0][1]);
-    let grid = make_whole_and_trim(grid);
-    // for line in grid {
-    //     println!("{}", line.iter().collect::<String>());
-    // }
-    1
+    let grid = flatten_and_trim(grid);
+    let monster = vec![
+        "                  # ".chars().collect::<Vec<char>>(),
+        "#    ##    ##    ###".chars().collect::<Vec<char>>(),
+        " #  #  #  #  #  #   ".chars().collect::<Vec<char>>()
+    ];
+    let monster_count = count_hashes(&monster);
+    let grid_count = count_hashes(&grid);
+    let monsters = count_monsters(grid, monster);
+
+    grid_count - (monster_count * monsters)
 }
 
-fn make_whole_and_trim(grid: Vec<Vec<Tile>>) -> Vec<Vec<char>> {
-    let mut whole_grid: Vec<Vec<char>> = Vec::new();
-    let mut buffer: Vec<Vec<String>> = vec![vec!["".to_owned(); grid[0][0].map.len()]; grid[0].len()];
-    for k in 0..grid[0][0].map.len() {
-        for i in 0..grid.len() {
-            for j in 0..grid[0].len() {
-                buffer[i][k].push_str(grid[i][j].map[k].iter().collect::<String>().as_str());
+fn count_hashes(map: &Vec<Vec<char>>) -> u32 {
+    let mut count = 0;
+    for line in map {
+        for c in line {
+            if *c == '#' {
+                count += 1;
             }
         }
     }
+    count
+}
+
+fn count_monsters(mut grid: Vec<Vec<char>>, monster: Vec<Vec<char>>) -> u32 {
+    let mut count: u32 = 0;
+
+     for _i in 1..=2 {
+        for _j in 1..=4 {
+             // until the monster touches the bottom
+            for i in 0..grid.len() - 3 {
+                // print ln!("grid i {}", i);
+                count += find_monsters(grid[i..i + monster.len()].to_vec(), &monster);
+            }
+             grid = rotate_map(grid);
+         }
+         grid = flip_map(grid);
+     }
+
+    count
+}
+
+fn find_monsters(chunk: Vec<Vec<char>>, monster: &Vec<Vec<char>>) -> u32 {
+    let mut count = 0;
+
+    // until the monster touches the end
+    for i in 0..=chunk[0].len() - monster[0].len() {
+        let mut is_monster = true;
+        for (li,line) in monster.iter().enumerate() {
+            for (ci, c) in line.iter().enumerate() {
+                match c {
+                    '#' => {
+                        if chunk[li][ci + i] != *c {
+                            is_monster = false;
+                            break
+                        }
+                    }
+                    _ => continue
+                }
+            }
+            if !is_monster {
+                break;
+            }
+        }
+        if is_monster {
+            count += 1;
+        }
+    }
+    count
+}
+
+fn flatten_and_trim(grid: Vec<Vec<Tile>>) -> Vec<Vec<char>> {
+    let mut buffer: Vec<Vec<String>> = vec![vec!["".to_owned(); grid[0][0].map.len() - 2]; grid[0].len()];
+
+    //cut off ends
+    let len = grid[0][0].map.len() - 1;
+
+    // cut off tops && bottoms
+    for k in 1..len {
+        for i in 0..grid.len() {
+            for j in 0..grid[0].len() {
+                // for every map, append map[k] line to buffer[k - 1]
+                // (-1 to account for shorter buffer length because trims)
+                let line = grid[i][j].map[k][1..len].iter().collect::<String>();
+                buffer[i][k - 1].push_str(line.as_str());
+            }
+        }
+    }
+
+    let mut flattened_grid: Vec<Vec<char>> = Vec::new();
     for chunk in buffer {
         for line in chunk {
-            whole_grid.push(line.chars()
-                            // .collect::<Vec<char>>()[1..line.len() - 1]
-                            // .iter()
-                            // .map(|c| *c)
+            flattened_grid.push(line.chars()
                             .collect::<Vec<char>>());
         }
     }
-    // whole_grid.pop();
-    // whole_grid.remove(whole_grid.len() - 1);
-    whole_grid
+
+    flattened_grid
 }
 
 fn part_1(mut tiles: Vec<Tile>) -> (u64, Vec<Vec<Tile>>) {
@@ -89,10 +157,10 @@ fn part_1(mut tiles: Vec<Tile>) -> (u64, Vec<Vec<Tile>>) {
 
     let mut first = tiles.pop().unwrap();
 
-    first = rotate(first);
-    first = flip(first);
-    first = rotate(first);
-    first = flip(first);
+    first = rotate_tile(first);
+    first = flip_tile(first);
+    first = rotate_tile(first);
+    first = flip_tile(first);
 
     grid[len][len] = first;
     tile_coords.push((len, len));
@@ -118,7 +186,6 @@ fn part_1(mut tiles: Vec<Tile>) -> (u64, Vec<Vec<Tile>>) {
         }
     }
     let grid = clear_whitespace(grid, len);
-    _print_grid(&grid);
 
     (grid[0][0].id * grid[0][len - 1].id * grid[len - 1][0].id * grid[len - 1][len - 1].id, grid)
 }
@@ -166,9 +233,9 @@ fn find_join(tile1: Tile, mut tile2: Tile) -> Option<(Tile, Join)> {
                 let join = Join{ x: 1, y: 0 };
                 return Some((tile2, join))
             }
-            tile2 = rotate(tile2);
+            tile2 = rotate_tile(tile2);
         }
-        tile2 = flip(tile2);
+        tile2 = flip_tile(tile2);
     }
     None
 }
@@ -191,8 +258,16 @@ fn build_tiles(contents: String) -> Vec<Tile> {
             .collect::<Vec<Tile>>()
 }
 
-fn rotate(tile: Tile) -> Tile {
+fn rotate_tile(tile: Tile) -> Tile {
     let mut map = tile.map.clone();
+    map = rotate_map(map);
+    Tile {
+        id: tile.id,
+        map
+    }
+}
+
+fn rotate_map(mut map: Vec<Vec<char>>) -> Vec<Vec<char>> {
     let n = map.len();
     for x in 0..n {
         for y in x..n {
@@ -209,19 +284,20 @@ fn rotate(tile: Tile) -> Tile {
             map[x][n - y - 1] = xy;
         }
     }
+    map
+}
+
+fn flip_tile(tile: Tile) -> Tile {
     Tile {
         id: tile.id,
-        map
+        map: flip_map(tile.map)
     }
 }
 
-fn flip(tile: Tile) -> Tile {
-    Tile {
-        id: tile.id,
-        map: tile.map.iter().map(|line| {
+fn flip_map(map: Vec<Vec<char>>) -> Vec<Vec<char>> {
+    map.iter().map(|line| {
             return line.iter().rev().map(|c| *c).collect::<Vec<char>>();
         }).collect::<Vec<Vec<char>>>()
-    }
 }
 
 fn empty_grid(len: usize) -> Tile {
@@ -258,11 +334,46 @@ fn _print_grid(grid: &Vec<Vec<Tile>>) {
 }
 
 fn part_2_test() {
+    let expected_map = ".#.#..#.##...#.##..#####\n\
+                        ###....#.#....#..#......\n\
+                        ##.##.###.#.#..######...\n\
+                        ###.#####...#.#####.#..#\n\
+                        ##.#....#.##.####...#.##\n\
+                        ...########.#....#####.#\n\
+                        ....#..#...##..#.#.###..\n\
+                        .####...#..#.....#......\n\
+                        #..#.##..#..###.#.##....\n\
+                        #.####..#.####.#.#.###..\n\
+                        ###.#.#...#.######.#..##\n\
+                        #.####....##..########.#\n\
+                        ##..##.#...#...#.#.#.#..\n\
+                        ...#..#..#.#.##..###.###\n\
+                        .#.#....#.##.#...###.##.\n\
+                        ###.#...#..#.##.######..\n\
+                        .#.#.###.##.##.#..#.##..\n\
+                        .####.###.#...###.#..#.#\n\
+                        ..#.#..#..#.#.#.####.###\n\
+                        #..####...#.#.#.###.###.\n\
+                        #####..#####...###....##\n\
+                        #.##..#..#...#..####...#\n\
+                        .#.###..##..##..####.##.\n\
+                        ...###...##...#...#..###".split("\n").map(|line| line.chars().collect::<Vec<char>>()).collect::<Vec<Vec<char>>>();
+
     let contents = read_file("test_input.txt");
     let tiles = build_tiles(contents);
     let grid = part_1(tiles).1;
 
+    assert_eq!(flatten_and_trim(grid.clone()), expected_map);
+
+    let monster = vec![
+        "                  # ".chars().collect::<Vec<char>>(),
+        "#    ##    ##    ###".chars().collect::<Vec<char>>(),
+        " #  #  #  #  #  #   ".chars().collect::<Vec<char>>()
+    ];
+    assert_eq!(find_monsters(monster.clone(), &monster), 1);
+
     assert_eq!(part_2(grid), 273);
+
 }
 fn part_1_tests() {
     let contents = read_file("test_input.txt");
@@ -293,14 +404,14 @@ fn tiles_test() {
     assert_eq!(tile.top(), "#.#.#####.");
     assert_eq!(tile.bottom(), "..#.###...");
 
-    let tile = rotate(tile);
+    let tile = rotate_tile(tile);
 
     assert_eq!(tile.left(), "..#.###...");
     assert_eq!(tile.right(), "#.#.#####.");
     assert_eq!(tile.top(), "...#.##..#");
     assert_eq!(tile.bottom(), "...#....#.");
 
-    let tile = flip(tile);
+    let tile = flip_tile(tile);
 
     assert_eq!(tile.top(), "#..##.#...");
     assert_eq!(tile.bottom(), ".#....#...");
