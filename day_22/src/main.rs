@@ -1,5 +1,5 @@
 use std::io::Read;
-use std::time::Instant;
+use std::collections::HashSet;
 
 type Deck = Vec<u32>;
 
@@ -16,9 +16,7 @@ fn main() {
     println!("part 1: {}", part_1_result);
 
     part_2_test();
-    let now = Instant::now();
     let part_2_result = part_2(player_1, player_2);
-    println!("time: {:?}", Instant::now().duration_since(now));
     println!("part 2: {}", part_2_result);
 }
 
@@ -29,23 +27,20 @@ fn part_2(p1: Deck, p2: Deck) -> u32 {
 }
 
 fn new_game(mut p1: Deck, mut p2: Deck) -> (Deck, Deck) {
-    let mut history: Vec<Deck> = Vec::new();
-    let mut last = p1.clone();
-    while p1.len() > 0 && p2.len() > 0 {
-        if history.contains(&p1) {
-            let p1c = p1.pop().unwrap();
-            let p2c = p2.pop().unwrap();
-            p1.insert(0, p1c);
-            p1.insert(0, p2c);
-            history.push(p1.clone());
-            continue;
-        }
+    let mut history = HashSet::new();
 
-        let mut p1_win = winner(&p1, &p2);
+    while p1.len() > 0 && p2.len() > 0 {
+        if !history.insert((p1.clone(), p2.clone())) {
+            while p2.len() > 0 {
+                p1.insert(0, p2.pop().unwrap());
+            }
+            break
+        }
 
         let p1c = p1.pop().unwrap();
         let p2c = p2.pop().unwrap();
 
+        let mut p1_win = winner(p1c, p2c);
 
         if p1.len() as u32 >= p1c && p2.len() as u32 >= p2c {
             let p1_sub = trim(p1.clone(), p1c);
@@ -67,18 +62,13 @@ fn new_game(mut p1: Deck, mut p2: Deck) -> (Deck, Deck) {
             p2.insert(0, p2c);
             p2.insert(0, p1c);
         }
-        history.push(last);
-        last = p1.clone();
     }
 
     (p1, p2)
 }
 
-fn winner(p1: &Deck, p2: &Deck) -> bool {
-    if p1[p1.len() - 1] > p2[p2.len() - 1] {
-        return true;
-    }
-    false
+fn winner(p1: u32, p2: u32) -> bool {
+    p1 > p2
 }
 
 fn trim(mut deck: Deck, len: u32) -> Deck {
@@ -113,17 +103,12 @@ fn calculate_winner(left: Deck, right: Deck) -> u32 {
         winner = right;
     }
 
-    let mut score = 0;
-    for (i, card) in winner.iter().enumerate() {
-        score += card * (i + 1) as u32;
-    }
-    score
+    winner.iter().enumerate().map(|(i, c)| (i + 1) as u32 * c).sum()
 }
 
 fn build_deck(deck: &str) -> Deck {
-    let mut deck = deck.split("\n").collect::<Vec<&str>>();
+    let mut deck = deck.split("\n").skip(1).collect::<Vec<&str>>();
     deck.reverse();
-    deck.pop();
     deck.iter().map(|c| c.parse::<u32>().unwrap()).collect::<Deck>()
 }
 
